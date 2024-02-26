@@ -53,7 +53,7 @@ Ext2Explore::Ext2Explore(QWidget *parent) :
     ui->tree->setSelectionMode(QAbstractItemView::SingleSelection);
 
     ui->list->setSelectionBehavior(QAbstractItemView::SelectRows);
-    ui->list->setSelectionMode( QAbstractItemView::SingleSelection );
+    ui->list->setSelectionMode( QAbstractItemView::ExtendedSelection);
     ui->list->setModel(filemodel);
     ui->list->setViewMode(QListView::IconMode);
     ui->list->setIconSize(QSize(50,60));
@@ -317,27 +317,52 @@ void Ext2Explore::on_action_Save_triggered()
     if(indexes.length() <= 0)
         return;
 
-    index = indexes[0];
-    item = filemodel->itemFromIndex(index);
-    fileData = item->data(Qt::UserRole);
-    file = (Ext2File *) fileData.value<void *>();
+    if (indexes.length() == 1) {
+        index = indexes[0];
+        item = filemodel->itemFromIndex(index);
+        fileData = item->data(Qt::UserRole);
+        file = (Ext2File *) fileData.value<void *>();
 
-    if(EXT2_S_ISDIR(file->inode.i_mode))
-    {
-        filename = QFileDialog::getExistingDirectory(this, tr("Save folder in"),
-                                                     QString(""),
-                                                     QFileDialog::ShowDirsOnly);
+        if(EXT2_S_ISDIR(file->inode.i_mode))
+        {
+            filename = QFileDialog::getExistingDirectory(this, tr("Save folder in"),
+                                                         QString(""),
+                                                         QFileDialog::ShowDirsOnly);
+        }
+        else
+        {
+            filename = QFileDialog::getSaveFileName(this, tr("Save File/Folder"),
+                                                    QString::fromStdString(file->file_name),
+                                                    tr("All Files (*)"));
+        }
+        if(filename.isEmpty())
+            return;
+
+        copyfile.set_file(file);
+        copyfile.set_name(filename);
+        copyfile.start_copy();
+        return;
     }
-    else
-    {
-        filename = QFileDialog::getSaveFileName(this, tr("Save File/Folder"),
-                                                QString::fromStdString(file->file_name),
-                                                tr("All Files (*)"));
-    }
-    if(filename.isEmpty())
+
+    QString folder = QFileDialog::getExistingDirectory(this, tr("Save files to..."),
+                                                 QString(""),
+                                                 QFileDialog::ShowDirsOnly);
+    if(folder.isEmpty())
         return;
 
-    copyfile.set_file(file);
-    copyfile.set_name(filename);
-    copyfile.start_copy();
+    QDir folderPath(folder);
+
+    QEventLoop block;
+    QObject::connect(&copyfile, &Ext2CopyFile::signal_copydone, &block, &QEventLoop::quit);
+    for (int i = 0; i < indexes.length(); ++i) {
+        index = indexes[i];
+        item = filemodel->itemFromIndex(index);
+        fileData = item->data(Qt::UserRole);
+        file = (Ext2File *) fileData.value<void *>();
+
+        copyfile.set_file(file);
+        copyfile.set_name(folderPath.filePath(QString::fromStdString(file->file_name)));
+        copyfile.start_copy();
+        block.exec();
+    }
 }

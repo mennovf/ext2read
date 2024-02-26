@@ -73,7 +73,7 @@ public:
     Ext2CopyFile();
     ~Ext2CopyFile();
     void set_file(Ext2File *sfile) { file = sfile; }
-    void set_name(QString &name) { filename = name; }
+    void set_name(QString const & name) { filename = name; }
     void start_copy();
 
 private:
@@ -88,6 +88,7 @@ public slots:
 
 signals:
     void signal_cancelprocess();
+    void signal_copydone();
 };
 
 #endif // EXT2COPYFILE_H

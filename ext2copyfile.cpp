@@ -101,6 +101,7 @@ void Ext2CopyFile::slot_copydone()
     //delete this;
     delete proc;
     this->hide();
+    emit signal_copydone();
 }
 
 Ext2CopyProcess::Ext2CopyProcess(Ext2File *parent, QString &dest)
