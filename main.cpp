@@ -25,6 +25,7 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
 
     Q_INIT_RESOURCE(ext2explore);
+    qRegisterMetaType<Ext2File*>();
     log_init();
     Ext2Explore w;
     w.show();

@@ -31,6 +31,7 @@
 #include <list>
 #include <string>
 #include <QCache>
+#include <QObject>
 #include <stdio.h>
 
 #include "platform.h"
@@ -132,6 +133,8 @@ public:
     Ext2Partition *partition;
     bool onview;
 };
+
+Q_DECLARE_METATYPE(Ext2File *);
 
 typedef struct ext2dirent {
     EXT2_DIR_ENTRY *next;

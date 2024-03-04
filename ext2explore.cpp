@@ -29,6 +29,8 @@
 
 #include "ui_ext2explore.h"
 
+#include <time.h>
+
 Ext2Explore::Ext2Explore(QWidget *parent) :
         QMainWindow(parent),
         ui(new Ui::Ext2Explore)
@@ -106,7 +108,7 @@ void Ext2Explore::delete_children(QStandardItem *parent)
 
         delete_children(item);
         fileData = item->data(Qt::UserRole);
-        file = (Ext2File *) fileData.value<void *>();
+        file = fileData.value<Ext2File *>();
         delete file;
     }
     parent->removeRows(0, nrows);
@@ -119,7 +121,7 @@ void Ext2Explore::init_root_fs()
     list<Ext2Partition *>::iterator i;
     QStandardItem *item;
     QString text;
-    void *ptr;
+    Ext2File *ptr;
 
     parts = app->get_partitions();
     for(i = parts.begin(); i != parts.end(); i++)
@@ -140,7 +142,7 @@ void Ext2Explore::init_root_fs()
         }
 
         ptr = temp->get_root();
-        item->setData(qVariantFromValue(ptr), Qt::UserRole);
+        item->setData(QVariant::fromValue(ptr), Qt::UserRole);
         item->setEditable(false);
         root->appendRow(item);
         temp->onview = true;
@@ -192,7 +194,7 @@ void Ext2Explore::on_actionP_roperties_triggered()
     foreach(index, indexes) {
         item = filemodel->itemFromIndex(index);
         fileData = item->data(Qt::UserRole);
-        file = (Ext2File *) fileData.value<void *>();
+        file = fileData.value<Ext2File *>();
         property.set_properties(file);
         break;  // FIXME: Getting the first selected item only.
     }
@@ -240,9 +242,26 @@ void Ext2Explore::on_action_item_clicked(const QModelIndex &index)
 
     parentItem = filemodel->itemFromIndex(index);
     fileData = parentItem->data(Qt::UserRole);
-    parentFile = (Ext2File *) fileData.value<void *>();
+    parentFile = fileData.value<Ext2File *>();
 
     statusBar()->showMessage(QString(parentFile->file_name.c_str()));
+}
+
+namespace {
+QString human_readable_size(size_t nbytes) {
+    static char const * const UNIT_PREFIXES[] = {"", "k", "M", "G", "T", "P", "E", "Z", "Y"};
+    size_t index = 0;
+    while (nbytes > 1024) {
+        nbytes /= 1024;
+        ++index;
+    }
+
+    if (index > sizeof(UNIT_PREFIXES) / sizeof(UNIT_PREFIXES[0])) {
+        return QString("LARGE");
+    }
+
+    return QString("%1 %2B").arg(nbytes).arg(UNIT_PREFIXES[index]);
+}
 }
 
 void Ext2Explore::on_action_item_dbclicked(const QModelIndex &index)
@@ -257,7 +276,7 @@ void Ext2Explore::on_action_item_dbclicked(const QModelIndex &index)
 
     parentItem = filemodel->itemFromIndex(index);
     fileData = parentItem->data(Qt::UserRole);
-    parentFile = (Ext2File *) fileData.value<void *>();
+    parentFile = fileData.value<Ext2File *>();
     if(!EXT2_S_ISDIR(parentFile->inode.i_mode)) {
         LOG("File %s is not a directory\n", parentFile->file_name.c_str());
         return;
@@ -275,9 +294,13 @@ void Ext2Explore::on_action_item_dbclicked(const QModelIndex &index)
     {
         LOG("Found File %s inode %d \n", files->file_name.c_str(), files->inode_num);
 
+        time_t const modification_time = files->inode.i_mtime;
+        struct tm tm;
+        gmtime_s(&tm, &modification_time);
+        size_t const size_bytes = files->inode.i_size;
         children = new QStandardItem(QIcon(handle_mime(files->file_name, files->inode.i_mode)),
-                                     codec->toUnicode(files->file_name.c_str()));
-        children->setData(qVariantFromValue((void *)files), Qt::UserRole);
+                                     codec->toUnicode(files->file_name.c_str()) + QString(" - %1/%2/%3 (%4)").arg(tm.tm_mday).arg(tm.tm_mon + 1).arg(tm.tm_year + 1900).arg(human_readable_size(size_bytes)));
+        children->setData(QVariant::fromValue(files), Qt::UserRole);
         children->setEditable(false);
         parentItem->appendRow(children);
         parentFile->onview = true;
@@ -321,7 +344,7 @@ void Ext2Explore::on_action_Save_triggered()
         index = indexes[0];
         item = filemodel->itemFromIndex(index);
         fileData = item->data(Qt::UserRole);
-        file = (Ext2File *) fileData.value<void *>();
+        file = fileData.value<Ext2File *>();
 
         if(EXT2_S_ISDIR(file->inode.i_mode))
         {
@@ -358,7 +381,7 @@ void Ext2Explore::on_action_Save_triggered()
         index = indexes[i];
         item = filemodel->itemFromIndex(index);
         fileData = item->data(Qt::UserRole);
-        file = (Ext2File *) fileData.value<void *>();
+        file = fileData.value<Ext2File *>();
 
         copyfile.set_file(file);
         copyfile.set_name(folderPath.filePath(QString::fromStdString(file->file_name)));
